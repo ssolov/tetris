@@ -1,2 +1,2 @@
 # tetris
-Tetris is an old school Terminator game
+Tetris is an old school terminal game
