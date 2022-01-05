@@ -51,13 +51,13 @@ fn print_board(board: &[[u8; 10]]) {
             )))
             .unwrap();
 
-        if y < board.len() - 1 {
-            row += 1;
-            stdout.queue(cursor::MoveTo(0, row)).unwrap();
-            stdout
-                .queue(style::Print(&format!("\u{2502}{: >20}", "\u{2502}")))
-                .unwrap();
-        }
+        //if y < board.len() - 1 {
+        //    row += 1;
+        //    stdout.queue(cursor::MoveTo(0, row)).unwrap();
+        //    stdout
+        //        .queue(style::Print(&format!("\u{2502}{: >20}", "\u{2502}")))
+        //        .unwrap();
+        //}
     }
 
     row += 1;
@@ -125,7 +125,7 @@ fn run(board: &mut [[u8; 10]], mut shape: Shape) {
                     _ => (),
                 }
 
-                thread::sleep(Duration::from_millis(500));
+                //thread::sleep(Duration::from_millis(500));
             }
         }
     }
