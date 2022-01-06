@@ -63,11 +63,19 @@ fn print_board(board: &[[u8; 10]], score: u32, speed: u64) {
 
     row += 1;
     stdout.queue(cursor::MoveTo(0, row)).unwrap();
-    stdout.queue(style::Print(&format!("\u{2514}{:\u{2500}>20}", "\u{2518}"))).unwrap();
+    stdout
+        .queue(style::Print(&format!("\u{2514}{:\u{2500}>20}", "\u{2518}")))
+        .unwrap();
 
     row += 2;
     stdout.queue(cursor::MoveTo(0, row)).unwrap();
-    stdout.queue(style::Print(&format!("Score: {} Speed: {}", score, 1000 - speed))).unwrap();
+    stdout
+        .queue(style::Print(&format!(
+            "Score: {} Speed: {}",
+            score,
+            1000 - speed
+        )))
+        .unwrap();
     stdout.flush().unwrap();
 }
 
