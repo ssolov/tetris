@@ -1,15 +1,16 @@
 use crossterm::{
     cursor,
-    event::{poll, read, Event, KeyCode},
+    event::{Event, EventStream, KeyCode, KeyEvent},
     queue, style,
     terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
-    QueueableCommand,
+    QueueableCommand, Result,
 };
+use futures::{executor, select, FutureExt, StreamExt};
+use futures_timer::Delay;
 use itertools::Itertools;
 use rand::{thread_rng, Rng};
 use std::{
     io::{stdout, Write},
-    process, thread,
     time::Duration,
 };
 
@@ -69,67 +70,7 @@ fn print_board(board: &[[u8; 10]]) {
     stdout.flush().unwrap();
 }
 
-fn run(board: &mut [[u8; 10]], mut shape: Shape) {
-    loop {
-        change(board, &shape.body, 1);
-        print_board(&board);
-        change(board, &shape.body, 0);
-
-        if let Some(next_shape) = shape.down() {
-            if !validate(&board, &next_shape.body) {
-                change(board, &shape.body, 1);
-                print_board(&board);
-                break;
-            }
-
-            shape = next_shape;
-
-            if poll(Duration::from_millis(500)).unwrap() {
-                match read().unwrap() {
-                    Event::Key(e) => {
-                        let next_shape = match e.code {
-                            KeyCode::Left => shape.left(),
-                            KeyCode::Right => shape.right(),
-                            KeyCode::Up => shape.turn_left(),
-                            KeyCode::Char(' ') => {
-                                let mut shape = Some(shape.clone());
-                                loop {
-                                    let next = shape.as_ref().map(|s| s.down()).flatten();
-
-                                    if next
-                                        .as_ref()
-                                        .filter(|s| validate(&board, &s.body))
-                                        .is_some()
-                                    {
-                                        shape = next;
-                                    } else {
-                                        break;
-                                    }
-                                }
-
-                                shape
-                            }
-                            KeyCode::Esc => process::exit(0x0100),
-                            _ => None,
-                        };
-
-                        if let Some(next_shape) = next_shape {
-                            change(board, &shape.body, 0);
-                            if validate(&board, &next_shape.body) {
-                                shape = next_shape;
-                            }
-                            change(board, &shape.body, 1);
-                            print_board(&board);
-                        }
-                    }
-                    _ => (),
-                }
-
-                //thread::sleep(Duration::from_millis(500));
-            }
-        }
-    }
-
+fn remove_completed_lines(board: &mut [[u8; 10]]) {
     for y in 0..board.len() {
         if board[y].iter().find(|&n| n == &0).is_none() {
             let mut prev = y;
@@ -143,6 +84,94 @@ fn run(board: &mut [[u8; 10]], mut shape: Shape) {
     }
 }
 
+fn random_shape() -> Shape {
+    let nr = thread_rng().gen_range(0..=16);
+    match nr {
+        0 => Shape::new(ShapeType::SForm, Direction::Top),
+        1 => Shape::new(ShapeType::SForm, Direction::Left),
+        2 => Shape::new(ShapeType::LForm, Direction::Top),
+        3 => Shape::new(ShapeType::LForm, Direction::Left),
+        4 => Shape::new(ShapeType::LForm, Direction::Bottom),
+        5 => Shape::new(ShapeType::LForm, Direction::Right),
+        6 => Shape::new(ShapeType::LMirrored, Direction::Top),
+        7 => Shape::new(ShapeType::LMirrored, Direction::Left),
+        8 => Shape::new(ShapeType::LMirrored, Direction::Bottom),
+        9 => Shape::new(ShapeType::LMirrored, Direction::Right),
+        10 => Shape::new(ShapeType::TForm, Direction::Top),
+        11 => Shape::new(ShapeType::TForm, Direction::Left),
+        12 => Shape::new(ShapeType::TForm, Direction::Bottom),
+        13 => Shape::new(ShapeType::TForm, Direction::Right),
+        14 => Shape::new(ShapeType::Line, Direction::Top),
+        15 => Shape::new(ShapeType::Line, Direction::Left),
+        _ => Shape::new(ShapeType::Quadrat, Direction::Top),
+    }
+}
+
+async fn run_game() -> Result<()> {
+    let mut event_stream = EventStream::new();
+    let mut board = [[0_u8; 10]; 22];
+    let mut shape = random_shape();
+
+    loop {
+        let mut delay = Delay::new(Duration::from_millis(500)).fuse();
+        let mut next_event = event_stream.next().fuse();
+
+        change(&mut board, &shape.body, 1);
+        print_board(&board);
+        change(&mut board, &shape.body, 0);
+
+        select! {
+            _ = delay => {
+                if let Some(next_shape) = shape.down().filter(|s| validate(&board, &s.body)) {
+                    shape = next_shape;
+                } else {
+                    change(&mut board, &shape.body, 1);
+
+                    shape = random_shape();
+                    if !validate(&board, &shape.body) {
+                        change(&mut board, &shape.body, 1);
+                        break;
+                    }
+                }
+            },
+            event = next_event => {
+                if let Some(next_shape) = match event {
+                    Some(Ok(Event::Key(KeyEvent { code: KeyCode::Left, ..}))) => shape.left(),
+                    Some(Ok(Event::Key(KeyEvent { code: KeyCode::Right, ..}))) => shape.right(),
+                    Some(Ok(Event::Key(KeyEvent { code: KeyCode::Up, ..}))) => shape.turn_left(),
+                    Some(Ok(Event::Key(KeyEvent { code: KeyCode::Char(' '), ..}))) => {
+                        let mut shape = Some(shape.clone());
+                        loop {
+                            let next = shape.as_ref().map(|s| s.down()).flatten();
+
+                            if next
+                                .as_ref()
+                                .filter(|s| validate(&board, &s.body))
+                                .is_some()
+                            {
+                                shape = next;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        shape
+                    },
+                    Some(Ok(Event::Key(KeyEvent { code: KeyCode::Esc, ..}))) => break,
+                    _ => None,
+
+                }.filter(|s| validate(&board, &s.body)) {
+                    shape = next_shape;
+                }
+            },
+        };
+
+        remove_completed_lines(&mut board);
+    }
+
+    Ok(())
+}
+
 fn main() {
     enable_raw_mode().unwrap();
 
@@ -152,34 +181,7 @@ fn main() {
     queue!(stdout, Clear(ClearType::All)).unwrap();
     stdout.flush().unwrap();
 
-    let mut board = [[0_u8; 10]; 22];
-
-    loop {
-        let nr = thread_rng().gen_range(0..=16);
-        let shape = match nr {
-            0 => Shape::new(ShapeType::SForm, Direction::Top),
-            1 => Shape::new(ShapeType::SForm, Direction::Left),
-            2 => Shape::new(ShapeType::LForm, Direction::Top),
-            3 => Shape::new(ShapeType::LForm, Direction::Left),
-            4 => Shape::new(ShapeType::LForm, Direction::Bottom),
-            5 => Shape::new(ShapeType::LForm, Direction::Right),
-            6 => Shape::new(ShapeType::LMirrored, Direction::Top),
-            7 => Shape::new(ShapeType::LMirrored, Direction::Left),
-            8 => Shape::new(ShapeType::LMirrored, Direction::Bottom),
-            9 => Shape::new(ShapeType::LMirrored, Direction::Right),
-            10 => Shape::new(ShapeType::TForm, Direction::Top),
-            11 => Shape::new(ShapeType::TForm, Direction::Left),
-            12 => Shape::new(ShapeType::TForm, Direction::Bottom),
-            13 => Shape::new(ShapeType::TForm, Direction::Right),
-            14 => Shape::new(ShapeType::Line, Direction::Top),
-            15 => Shape::new(ShapeType::Line, Direction::Left),
-            _ => Shape::new(ShapeType::Quadrat, Direction::Top),
-        };
-        if !validate(&board, &shape.body) {
-            break;
-        }
-        run(&mut board, shape);
-    }
+    let _ = executor::block_on(run_game());
 
     queue!(stdout, cursor::Show).unwrap();
     stdout.flush().unwrap();
