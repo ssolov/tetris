@@ -32,7 +32,7 @@ fn change(board: &mut [[u8; 10]], pos: &[Position; 4], occupied: u8) {
     pos.iter().for_each(|p| board[p.y][p.x] = occupied)
 }
 
-fn print_board(board: &[[u8; 10]]) {
+fn print_board(board: &[[u8; 10]], score: u32, speed: u64) {
     let mut row = 0;
     let mut stdout = stdout();
     stdout.queue(cursor::MoveTo(0, row)).unwrap();
@@ -63,14 +63,16 @@ fn print_board(board: &[[u8; 10]]) {
 
     row += 1;
     stdout.queue(cursor::MoveTo(0, row)).unwrap();
-    stdout
-        .queue(style::Print(&format!("\u{2514}{:\u{2500}>20}", "\u{2518}")))
-        .unwrap();
+    stdout.queue(style::Print(&format!("\u{2514}{:\u{2500}>20}", "\u{2518}"))).unwrap();
 
+    row += 2;
+    stdout.queue(cursor::MoveTo(0, row)).unwrap();
+    stdout.queue(style::Print(&format!("Score: {} Speed: {}", score, 1000 - speed))).unwrap();
     stdout.flush().unwrap();
 }
 
-fn remove_completed_lines(board: &mut [[u8; 10]]) {
+fn remove_completed_lines(board: &mut [[u8; 10]]) -> u32 {
+    let mut score = 0_u32;
     for y in 0..board.len() {
         if board[y].iter().find(|&n| n == &0).is_none() {
             let mut prev = y;
@@ -79,9 +81,11 @@ fn remove_completed_lines(board: &mut [[u8; 10]]) {
                 prev = b;
             }
             board[0] = [0; 10];
-            print_board(&board);
+            score += 10;
         }
     }
+
+    score
 }
 
 fn random_shape() -> Shape {
@@ -111,17 +115,28 @@ async fn run_game() -> Result<()> {
     let mut event_stream = EventStream::new();
     let mut board = [[0_u8; 10]; 22];
     let mut shape = random_shape();
+    let mut down_delay = 1000;
+    let speed_up_delay = 30;
+    let mut score = 0;
+
+    let mut speed_up = Delay::new(Duration::from_secs(speed_up_delay)).fuse();
+    let mut down = Delay::new(Duration::from_millis(down_delay)).fuse();
 
     loop {
-        let mut delay = Delay::new(Duration::from_millis(500)).fuse();
         let mut next_event = event_stream.next().fuse();
 
         change(&mut board, &shape.body, 1);
-        print_board(&board);
+        print_board(&board, score, down_delay);
         change(&mut board, &shape.body, 0);
 
         select! {
-            _ = delay => {
+            _ = speed_up => {
+                down_delay -= 100;
+                speed_up = Delay::new(Duration::from_secs(speed_up_delay)).fuse();
+            },
+            _ = down => {
+                down = Delay::new(Duration::from_millis(down_delay)).fuse();
+
                 if let Some(next_shape) = shape.down().filter(|s| validate(&board, &s.body)) {
                     shape = next_shape;
                 } else {
@@ -166,7 +181,11 @@ async fn run_game() -> Result<()> {
             },
         };
 
-        remove_completed_lines(&mut board);
+        let new_score = remove_completed_lines(&mut board);
+        if new_score > 0 {
+            score += new_score;
+            print_board(&board, score, down_delay);
+        }
     }
 
     Ok(())
