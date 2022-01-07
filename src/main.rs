@@ -96,6 +96,24 @@ fn remove_completed_lines(board: &mut [[u8; 10]]) -> u32 {
     score
 }
 
+fn move_shape_down(shape: Shape, board: &[[u8; 10]], steps: Option<usize>) -> Option<Shape> {
+    let mut steps = steps.unwrap_or(board.len());
+    let mut shape = Some(shape);
+
+    while steps > 0 {
+        steps -= 1;
+        let next = shape.as_ref().map(|s| s.down()).flatten();
+
+        if next.as_ref().filter(|s| validate(board, &s.body)).is_some() {
+            shape = next;
+        } else {
+            break;
+        }
+    }
+
+    shape
+}
+
 fn random_shape() -> Shape {
     let nr = thread_rng().gen_range(0..=16);
     match nr {
@@ -162,24 +180,8 @@ async fn run_game() -> Result<()> {
                     Some(Ok(Event::Key(KeyEvent { code: KeyCode::Left, ..}))) => shape.left(),
                     Some(Ok(Event::Key(KeyEvent { code: KeyCode::Right, ..}))) => shape.right(),
                     Some(Ok(Event::Key(KeyEvent { code: KeyCode::Up, ..}))) => shape.turn_left(),
-                    Some(Ok(Event::Key(KeyEvent { code: KeyCode::Char(' '), ..}))) => {
-                        let mut shape = Some(shape.clone());
-                        loop {
-                            let next = shape.as_ref().map(|s| s.down()).flatten();
-
-                            if next
-                                .as_ref()
-                                .filter(|s| validate(&board, &s.body))
-                                .is_some()
-                            {
-                                shape = next;
-                            } else {
-                                break;
-                            }
-                        }
-
-                        shape
-                    },
+                    Some(Ok(Event::Key(KeyEvent { code: KeyCode::Down, ..}))) => move_shape_down(shape.clone(), &board, Some(3)),
+                    Some(Ok(Event::Key(KeyEvent { code: KeyCode::Char(' '), ..}))) => move_shape_down(shape.clone(), &board, None),
                     Some(Ok(Event::Key(KeyEvent { code: KeyCode::Esc, ..}))) => break,
                     _ => None,
 
