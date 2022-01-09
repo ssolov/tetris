@@ -1,9 +1,9 @@
 use crossterm::{
     cursor,
-    event::{Event, EventStream, KeyCode, KeyEvent},
-    queue, style,
+    event::{read, Event, EventStream, KeyCode, KeyEvent},
+    style,
     terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
-    QueueableCommand, Result,
+    ExecutableCommand, QueueableCommand, Result,
 };
 use futures::{executor, select, FutureExt, StreamExt};
 use futures_timer::Delay;
@@ -51,14 +51,6 @@ fn print_board(board: &[[u8; 10]], score: u32, speed: u64) {
                     .join(" ")
             )))
             .unwrap();
-
-        //if y < board.len() - 1 {
-        //    row += 1;
-        //    stdout.queue(cursor::MoveTo(0, row)).unwrap();
-        //    stdout
-        //        .queue(style::Print(&format!("\u{2502}{: >20}", "\u{2502}")))
-        //        .unwrap();
-        //}
     }
 
     row += 1;
@@ -201,18 +193,55 @@ async fn run_game() -> Result<()> {
     Ok(())
 }
 
+fn print_help() {
+    let mut stdout = stdout();
+    stdout.queue(cursor::Hide).unwrap();
+    stdout.queue(cursor::MoveTo(0, 0)).unwrap();
+    stdout.queue(Clear(ClearType::All)).unwrap();
+
+    stdout.queue(style::Print("Key bindings:")).unwrap();
+    stdout.queue(cursor::MoveTo(0, 1)).unwrap();
+    stdout
+        .queue(style::Print("\u{2190} - Move to the left"))
+        .unwrap();
+    stdout.queue(cursor::MoveTo(0, 2)).unwrap();
+    stdout
+        .queue(style::Print("\u{2192} - Move to the right"))
+        .unwrap();
+    stdout.queue(cursor::MoveTo(0, 3)).unwrap();
+    stdout
+        .queue(style::Print("\u{2191} - Rotate 180 °"))
+        .unwrap();
+    stdout.queue(cursor::MoveTo(0, 4)).unwrap();
+    stdout
+        .queue(style::Print("\u{2193} - Move down 3 lines"))
+        .unwrap();
+    stdout.queue(cursor::MoveTo(0, 5)).unwrap();
+    stdout.queue(style::Print("SPACE - drop down")).unwrap();
+    stdout.queue(cursor::MoveTo(0, 6)).unwrap();
+    stdout.queue(style::Print("ESC - quit the game")).unwrap();
+    stdout.queue(cursor::MoveTo(0, 8)).unwrap();
+    stdout
+        .queue(style::Print("Press any key to starg the game"))
+        .unwrap();
+
+    stdout.flush().unwrap();
+
+    read().unwrap();
+
+    stdout.execute(Clear(ClearType::All)).unwrap();
+}
+
 fn main() {
     enable_raw_mode().unwrap();
-
-    let mut stdout = stdout();
-    queue!(stdout, cursor::Hide).unwrap();
-    queue!(stdout, cursor::MoveTo(0, 0)).unwrap();
-    queue!(stdout, Clear(ClearType::All)).unwrap();
-    stdout.flush().unwrap();
+    print_help();
 
     let _ = executor::block_on(run_game());
 
-    queue!(stdout, cursor::Show).unwrap();
+    let mut stdout = stdout();
+    stdout.queue(cursor::MoveTo(0, 25)).unwrap();
+    stdout.queue(style::Print("GAME OVER\n\n")).unwrap();
+    stdout.queue(cursor::Show).unwrap();
     stdout.flush().unwrap();
     disable_raw_mode().unwrap();
 }
