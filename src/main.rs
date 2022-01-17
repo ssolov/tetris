@@ -210,7 +210,7 @@ fn print_help() {
         .unwrap();
     stdout.queue(cursor::MoveTo(0, 3)).unwrap();
     stdout
-        .queue(style::Print("\u{2191} - Rotate 180 °"))
+        .queue(style::Print("\u{2191} - Rotate 90°"))
         .unwrap();
     stdout.queue(cursor::MoveTo(0, 4)).unwrap();
     stdout
