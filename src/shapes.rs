@@ -34,7 +34,7 @@ pub(crate) enum ShapeType {
 #[derive(Debug, Clone)]
 pub(crate) struct Shape {
     pub(crate) body: ShapeBody,
-    shape_type: ShapeType,
+    pub(crate) shape_type: ShapeType,
     direction: Direction,
 }
 

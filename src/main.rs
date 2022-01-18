@@ -1,13 +1,12 @@
 use crossterm::{
     cursor,
     event::{read, Event, EventStream, KeyCode, KeyEvent},
-    style,
+    style::{self, Stylize},
     terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
     ExecutableCommand, QueueableCommand, Result,
 };
 use futures::{executor, select, FutureExt, StreamExt};
 use futures_timer::Delay;
-use itertools::Itertools;
 use rand::{thread_rng, Rng};
 use std::{
     io::{stdout, Write},
@@ -28,8 +27,22 @@ fn validate(board: &[[u8; 10]], shape_pos: &[Position; 4]) -> bool {
     true
 }
 
-fn change(board: &mut [[u8; 10]], pos: &[Position; 4], occupied: u8) {
-    pos.iter().for_each(|p| board[p.y][p.x] = occupied)
+fn change(board: &mut [[u8; 10]], shape: &Shape, occupied: bool) {
+    shape.body.iter().for_each(|p| {
+        board[p.y][p.x] = if occupied {
+            match shape.shape_type {
+                ShapeType::TForm => 1,
+                ShapeType::LForm => 2,
+                ShapeType::LMirrored => 3,
+                ShapeType::Line => 4,
+                ShapeType::SForm => 5,
+                ShapeType::SMirrored => 6,
+                ShapeType::Quadrat => 7,
+            }
+        } else {
+            0
+        }
+    })
 }
 
 fn print_board(board: &[[u8; 10]], score: u32, speed: u64) {
@@ -37,36 +50,62 @@ fn print_board(board: &[[u8; 10]], score: u32, speed: u64) {
     let mut stdout = stdout();
     stdout.queue(cursor::MoveTo(0, row)).unwrap();
     stdout
-        .queue(style::Print(&format!("\u{250C}{:\u{2500}>20}", "\u{2510}")))
+        .queue(style::PrintStyledContent(
+            format!("\u{250C}{:\u{2500}>20}", "\u{2510}").yellow(),
+        ))
         .unwrap();
-    for y in 2..board.len() {
+    for line in board.iter().skip(2) {
         row += 1;
         stdout.queue(cursor::MoveTo(0, row)).unwrap();
         stdout
-            .queue(style::Print(&format!(
-                "\u{2502}{}\u{2502}",
-                board[y]
-                    .iter()
-                    .map(|r| format!("{}", if r == &0 { ' ' } else { '\u{2587}' }))
-                    .join(" ")
-            )))
+            .queue(style::PrintStyledContent("\u{2502}".yellow()))
+            .unwrap();
+        for (i, cell) in line.iter().enumerate() {
+            match cell {
+                1 => stdout.queue(style::PrintStyledContent("\u{2587}".cyan())),
+                2 => stdout.queue(style::PrintStyledContent("\u{2587}".green())),
+                3 => stdout.queue(style::PrintStyledContent("\u{2587}".red())),
+                4 => stdout.queue(style::PrintStyledContent("\u{2587}".blue())),
+                5 => stdout.queue(style::PrintStyledContent("\u{2587}".magenta())),
+                6 => stdout.queue(style::PrintStyledContent("\u{2587}".white())),
+                7 => stdout.queue(style::PrintStyledContent("\u{2587}".grey())),
+                _ => stdout.queue(style::Print(" ")),
+            }
+            .unwrap();
+
+            if i < line.len() - 1 {
+                stdout.queue(style::Print(" ")).unwrap();
+            }
+        }
+
+        stdout
+            .queue(style::PrintStyledContent("\u{2502}".yellow()))
             .unwrap();
     }
 
     row += 1;
     stdout.queue(cursor::MoveTo(0, row)).unwrap();
     stdout
-        .queue(style::Print(&format!("\u{2514}{:\u{2500}>20}", "\u{2518}")))
+        .queue(style::PrintStyledContent(
+            format!("\u{2514}{:\u{2500}>20}", "\u{2518}").yellow(),
+        ))
         .unwrap();
 
     row += 2;
     stdout.queue(cursor::MoveTo(0, row)).unwrap();
     stdout
-        .queue(style::Print(&format!(
-            "Score: {} Speed: {}",
-            score,
-            1000 - speed
-        )))
+        .queue(style::PrintStyledContent("Score: ".dark_green()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(format!("{}", score).dark_red()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(" Speed: ".dark_green()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(
+            format!("{}", 1100 - speed).dark_red(),
+        ))
         .unwrap();
     stdout.flush().unwrap();
 }
@@ -74,7 +113,7 @@ fn print_board(board: &[[u8; 10]], score: u32, speed: u64) {
 fn remove_completed_lines(board: &mut [[u8; 10]]) -> u32 {
     let mut score = 0_u32;
     for y in 0..board.len() {
-        if board[y].iter().find(|&n| n == &0).is_none() {
+        if !board[y].iter().any(|n| n == &0) {
             let mut prev = y;
             for b in (0..prev).rev() {
                 board[prev] = board[b];
@@ -94,7 +133,7 @@ fn move_shape_down(shape: Shape, board: &[[u8; 10]], steps: Option<usize>) -> Op
 
     while steps > 0 {
         steps -= 1;
-        let next = shape.as_ref().map(|s| s.down()).flatten();
+        let next = shape.as_ref().and_then(|s| s.down());
 
         if next.as_ref().filter(|s| validate(board, &s.body)).is_some() {
             shape = next;
@@ -143,9 +182,9 @@ async fn run_game() -> Result<()> {
     loop {
         let mut next_event = event_stream.next().fuse();
 
-        change(&mut board, &shape.body, 1);
+        change(&mut board, &shape, true);
         print_board(&board, score, down_delay);
-        change(&mut board, &shape.body, 0);
+        change(&mut board, &shape, false);
 
         select! {
             _ = speed_up => {
@@ -158,11 +197,11 @@ async fn run_game() -> Result<()> {
                 if let Some(next_shape) = shape.down().filter(|s| validate(&board, &s.body)) {
                     shape = next_shape;
                 } else {
-                    change(&mut board, &shape.body, 1);
+                    change(&mut board, &shape, true);
 
                     shape = random_shape();
                     if !validate(&board, &shape.body) {
-                        change(&mut board, &shape.body, 1);
+                        change(&mut board, &shape, true);
                         break;
                     }
                 }
@@ -195,9 +234,14 @@ async fn run_game() -> Result<()> {
 
 fn print_help() {
     let mut stdout = stdout();
-    stdout.queue(cursor::Hide).unwrap();
     stdout.queue(cursor::MoveTo(0, 0)).unwrap();
     stdout.queue(Clear(ClearType::All)).unwrap();
+    stdout
+        .queue(style::SetAttribute(style::Attribute::Bold))
+        .unwrap();
+    stdout
+        .queue(style::SetForegroundColor(style::Color::DarkGreen))
+        .unwrap();
 
     stdout.queue(style::Print("Key bindings:")).unwrap();
     stdout.queue(cursor::MoveTo(0, 1)).unwrap();
@@ -209,9 +253,7 @@ fn print_help() {
         .queue(style::Print("\u{2192} - Move to the right"))
         .unwrap();
     stdout.queue(cursor::MoveTo(0, 3)).unwrap();
-    stdout
-        .queue(style::Print("\u{2191} - Rotate 90°"))
-        .unwrap();
+    stdout.queue(style::Print("\u{2191} - Rotate 90°")).unwrap();
     stdout.queue(cursor::MoveTo(0, 4)).unwrap();
     stdout
         .queue(style::Print("\u{2193} - Move down 3 lines"))
@@ -225,6 +267,13 @@ fn print_help() {
         .queue(style::Print("Press any key to starg the game"))
         .unwrap();
 
+    stdout
+        .queue(style::SetForegroundColor(style::Color::Reset))
+        .unwrap();
+    stdout
+        .queue(style::SetAttribute(style::Attribute::Reset))
+        .unwrap();
+
     stdout.flush().unwrap();
 
     read().unwrap();
@@ -234,13 +283,22 @@ fn print_help() {
 
 fn main() {
     enable_raw_mode().unwrap();
+    let mut stdout = stdout();
+    stdout.queue(cursor::Hide).unwrap();
     print_help();
 
     let _ = executor::block_on(run_game());
 
-    let mut stdout = stdout();
-    stdout.queue(cursor::MoveTo(0, 25)).unwrap();
-    stdout.queue(style::Print("GAME OVER\n\n")).unwrap();
+    stdout.queue(cursor::MoveTo(4, 25)).unwrap();
+    stdout
+        .queue(style::SetAttribute(style::Attribute::Bold))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent("GAME OVER\n\n".dark_red()))
+        .unwrap();
+    stdout
+        .queue(style::SetAttribute(style::Attribute::Reset))
+        .unwrap();
     stdout.queue(cursor::Show).unwrap();
     stdout.flush().unwrap();
     disable_raw_mode().unwrap();

@@ -6,6 +6,5 @@ edition = "2021"
 [dependencies]
 rand = "0.8"
 crossterm = { features = ["event-stream"], version = "0.22" }
-itertools = "0.10"
 futures = "0.3"
 futures-timer = "3.0"
