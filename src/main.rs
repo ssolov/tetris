@@ -112,6 +112,7 @@ fn print_board(board: &[[u8; 10]], score: u32, speed: u64) {
 
 fn remove_completed_lines(board: &mut [[u8; 10]]) -> u32 {
     let mut score = 0_u32;
+    let mut add = 10;
     for y in 0..board.len() {
         if !board[y].iter().any(|n| n == &0) {
             let mut prev = y;
@@ -120,7 +121,8 @@ fn remove_completed_lines(board: &mut [[u8; 10]]) -> u32 {
                 prev = b;
             }
             board[0] = [0; 10];
-            score += 10;
+            score += add;
+            add *= 2;
         }
     }
 
@@ -146,24 +148,24 @@ fn move_shape_down(shape: Shape, board: &[[u8; 10]], steps: Option<usize>) -> Op
 }
 
 fn random_shape() -> Shape {
-    let nr = thread_rng().gen_range(0..=16);
+    let nr = thread_rng().gen_range(0..=160);
     match nr {
-        0 => Shape::new(ShapeType::SForm, Direction::Top),
-        1 => Shape::new(ShapeType::SForm, Direction::Left),
-        2 => Shape::new(ShapeType::LForm, Direction::Top),
-        3 => Shape::new(ShapeType::LForm, Direction::Left),
-        4 => Shape::new(ShapeType::LForm, Direction::Bottom),
-        5 => Shape::new(ShapeType::LForm, Direction::Right),
-        6 => Shape::new(ShapeType::LMirrored, Direction::Top),
-        7 => Shape::new(ShapeType::LMirrored, Direction::Left),
-        8 => Shape::new(ShapeType::LMirrored, Direction::Bottom),
-        9 => Shape::new(ShapeType::LMirrored, Direction::Right),
-        10 => Shape::new(ShapeType::TForm, Direction::Top),
-        11 => Shape::new(ShapeType::TForm, Direction::Left),
-        12 => Shape::new(ShapeType::TForm, Direction::Bottom),
-        13 => Shape::new(ShapeType::TForm, Direction::Right),
-        14 => Shape::new(ShapeType::Line, Direction::Top),
-        15 => Shape::new(ShapeType::Line, Direction::Left),
+        0..=9 => Shape::new(ShapeType::SForm, Direction::Top),
+        10..=19 => Shape::new(ShapeType::SForm, Direction::Left),
+        20..=29 => Shape::new(ShapeType::LForm, Direction::Top),
+        30..=39 => Shape::new(ShapeType::LForm, Direction::Left),
+        40..=49 => Shape::new(ShapeType::LForm, Direction::Bottom),
+        50..=59 => Shape::new(ShapeType::LForm, Direction::Right),
+        60..=69 => Shape::new(ShapeType::LMirrored, Direction::Top),
+        70..=79 => Shape::new(ShapeType::LMirrored, Direction::Left),
+        80..=89 => Shape::new(ShapeType::LMirrored, Direction::Bottom),
+        90..=99 => Shape::new(ShapeType::LMirrored, Direction::Right),
+        100..=109 => Shape::new(ShapeType::TForm, Direction::Top),
+        110..=119 => Shape::new(ShapeType::TForm, Direction::Left),
+        120..=129 => Shape::new(ShapeType::TForm, Direction::Bottom),
+        130..=139 => Shape::new(ShapeType::TForm, Direction::Right),
+        140..=149 => Shape::new(ShapeType::Line, Direction::Top),
+        150..=159 => Shape::new(ShapeType::Line, Direction::Left),
         _ => Shape::new(ShapeType::Quadrat, Direction::Top),
     }
 }
