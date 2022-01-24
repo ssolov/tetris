@@ -62,13 +62,13 @@ fn print_board(board: &[[u8; 10]], score: u32, speed: u64) {
             .unwrap();
         for (i, cell) in line.iter().enumerate() {
             match cell {
-                1 => stdout.queue(style::PrintStyledContent("\u{2587}".cyan())),
-                2 => stdout.queue(style::PrintStyledContent("\u{2587}".green())),
-                3 => stdout.queue(style::PrintStyledContent("\u{2587}".red())),
-                4 => stdout.queue(style::PrintStyledContent("\u{2587}".blue())),
-                5 => stdout.queue(style::PrintStyledContent("\u{2587}".magenta())),
-                6 => stdout.queue(style::PrintStyledContent("\u{2587}".white())),
-                7 => stdout.queue(style::PrintStyledContent("\u{2587}".grey())),
+                1 => stdout.queue(style::PrintStyledContent("\u{2587}".dark_cyan())),
+                2 => stdout.queue(style::PrintStyledContent("\u{2587}".dark_green())),
+                3 => stdout.queue(style::PrintStyledContent("\u{2587}".dark_red())),
+                4 => stdout.queue(style::PrintStyledContent("\u{2587}".dark_blue())),
+                5 => stdout.queue(style::PrintStyledContent("\u{2587}".dark_magenta())),
+                6 => stdout.queue(style::PrintStyledContent("\u{2587}".red())),
+                7 => stdout.queue(style::PrintStyledContent("\u{2587}".dark_yellow())),
                 _ => stdout.queue(style::Print(" ")),
             }
             .unwrap();
@@ -200,7 +200,7 @@ async fn run_game() -> Result<()> {
         change(&mut board, &shape, false);
 
         select! {
-            _ = speed_up => {
+            _ = speed_up => if down_delay > 100 {
                 down_delay -= 100;
                 speed_up = Delay::new(Duration::from_secs(speed_up_delay)).fuse();
             },
@@ -252,37 +252,77 @@ fn print_help() {
     stdout
         .queue(style::SetAttribute(style::Attribute::Bold))
         .unwrap();
-    stdout
-        .queue(style::SetForegroundColor(style::Color::DarkGreen))
-        .unwrap();
 
-    stdout.queue(style::Print("Key bindings:")).unwrap();
+    stdout
+        .queue(style::PrintStyledContent("Key bindings:".dark_blue()))
+        .unwrap();
     stdout.queue(cursor::MoveTo(0, 1)).unwrap();
     stdout
-        .queue(style::Print("\u{2190} - Move to the left"))
+        .queue(style::PrintStyledContent("\u{2190}".dark_red()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(" - ".dark_yellow()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent("Move to the left".dark_green()))
         .unwrap();
     stdout.queue(cursor::MoveTo(0, 2)).unwrap();
     stdout
-        .queue(style::Print("\u{2192} - Move to the right"))
+        .queue(style::PrintStyledContent("\u{2192}".dark_red()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(" - ".dark_yellow()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent("Move to the right".dark_green()))
         .unwrap();
     stdout.queue(cursor::MoveTo(0, 3)).unwrap();
-    stdout.queue(style::Print("\u{2191} - Rotate 90°")).unwrap();
+    stdout
+        .queue(style::PrintStyledContent("\u{2191}".dark_red()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(" - ".dark_yellow()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent("Rotate 90°".dark_green()))
+        .unwrap();
     stdout.queue(cursor::MoveTo(0, 4)).unwrap();
     stdout
-        .queue(style::Print("\u{2193} - Move down 3 lines"))
+        .queue(style::PrintStyledContent("\u{2193}".dark_red()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(" - ".dark_yellow()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent("Move down 3 lines".dark_green()))
         .unwrap();
     stdout.queue(cursor::MoveTo(0, 5)).unwrap();
-    stdout.queue(style::Print("SPACE - drop down")).unwrap();
+    stdout
+        .queue(style::PrintStyledContent("SPACE".dark_red()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(" - ".dark_yellow()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent("drop down".dark_green()))
+        .unwrap();
     stdout.queue(cursor::MoveTo(0, 6)).unwrap();
-    stdout.queue(style::Print("ESC - quit the game")).unwrap();
+    stdout
+        .queue(style::PrintStyledContent("ESC".dark_red()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent(" - ".dark_yellow()))
+        .unwrap();
+    stdout
+        .queue(style::PrintStyledContent("quit the game".dark_green()))
+        .unwrap();
     stdout.queue(cursor::MoveTo(0, 8)).unwrap();
     stdout
-        .queue(style::Print("Press any key to starg the game"))
+        .queue(style::PrintStyledContent(
+            "Press any key to starg the game".dark_blue(),
+        ))
         .unwrap();
 
-    stdout
-        .queue(style::SetForegroundColor(style::Color::Reset))
-        .unwrap();
     stdout
         .queue(style::SetAttribute(style::Attribute::Reset))
         .unwrap();
