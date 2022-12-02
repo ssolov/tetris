@@ -319,7 +319,7 @@ fn print_help() {
     stdout.queue(cursor::MoveTo(0, 8)).unwrap();
     stdout
         .queue(style::PrintStyledContent(
-            "Press any key to starg the game".dark_blue(),
+            "Press any key to start the game".dark_blue(),
         ))
         .unwrap();
 
